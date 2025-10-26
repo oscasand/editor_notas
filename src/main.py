@@ -5,7 +5,8 @@ import os
 class SimpleNotepad:
     def __init__(self, root):
         self.root = root
-        self.root.title("Editor de Notas Simple")
+        self.default_title = "Editor de Notas Simple"
+        self.root.title(self.default_title)
         self.filename = None
         
         # Crear área de texto con scrollbar
@@ -61,11 +62,18 @@ class SimpleNotepad:
         self.text_area.bind('<<Modified>>', self.changed)
         self.text_modified = False
 
+    def _update_title(self):
+        if self.filename:
+            name = os.path.basename(self.filename)
+            self.root.title(f"{self.default_title} - {name}")
+        else:
+            self.root.title(self.default_title)
+
     def changed(self, event=None):
         if self.text_area.edit_modified():
             self.text_modified = True
             words = len(self.text_area.get(1.0, tk.END).split())
-            chars = len(self.text_area.get(1.0, tk.END))-1
+            chars = len(self.text_area.get(1.0, tk.END)) - 1
             self.status_bar.config(text=f'Caracteres: {chars} Palabras: {words}')
         self.text_area.edit_modified(False)
         
@@ -80,6 +88,7 @@ class SimpleNotepad:
         self.filename = None
         self.text_modified = False
         self.status_bar.config(text="Nuevo archivo")
+        self._update_title()
         
     def open_file(self):
         if self.text_modified:
@@ -88,54 +97,64 @@ class SimpleNotepad:
                 return
             if response:
                 self.save_file()
-                
-        file = filedialog.askopenfile(defaultextension=".txt",
+
+        file_path = filedialog.askopenfilename(defaultextension=".txt",
                                     filetypes=[("Archivos de texto", "*.txt"),
-                                             ("Todos los archivos", "*.*")])
-        if file:
-            self.filename = file.name
-            self.text_area.delete(1.0, tk.END)
-            self.text_area.insert(1.0, file.read())
-            file.close()
-            self.text_modified = False
-            self.status_bar.config(text=f"Abierto: {os.path.basename(self.filename)}")
-            
+                                               ("Todos los archivos", "*.*")])
+        if file_path:
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                self.filename = file_path
+                self.text_area.delete(1.0, tk.END)
+                self.text_area.insert(1.0, content)
+                self.text_modified = False
+                self.status_bar.config(text=f"Abierto: {os.path.basename(self.filename)}")
+                self._update_title()
+            except Exception as e:
+                messagebox.showerror("Error", f"No se pudo abrir el archivo: {str(e)}")
+
     def save_file(self):
         if self.filename:
             try:
                 text = self.text_area.get(1.0, tk.END)
-                with open(self.filename, 'w') as file:
+                with open(self.filename, 'w', encoding='utf-8') as file:
                     file.write(text)
                 self.text_modified = False
                 self.status_bar.config(text=f"Guardado: {os.path.basename(self.filename)}")
+                self._update_title()
             except Exception as e:
                 messagebox.showerror("Error", f"No se pudo guardar el archivo: {str(e)}")
         else:
             self.save_as_file()
             
     def save_as_file(self):
-        file = filedialog.asksaveasfile(defaultextension=".txt",
+        file_path = filedialog.asksaveasfilename(defaultextension=".txt",
                                       filetypes=[("Archivos de texto", "*.txt"),
-                                               ("Todos los archivos", "*.*")])
-        if file:
-            self.filename = file.name
+                                                 ("Todos los archivos", "*.*")])
+        if file_path:
             try:
+                self.filename = file_path
                 text = self.text_area.get(1.0, tk.END)
-                file.write(text)
-                file.close()
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write(text)
                 self.text_modified = False
                 self.status_bar.config(text=f"Guardado: {os.path.basename(self.filename)}")
+                self._update_title()
             except Exception as e:
                 messagebox.showerror("Error", f"No se pudo guardar el archivo: {str(e)}")
 
     def cut_text(self):
         self.text_area.event_generate("<<Cut>>")
         
+        
     def copy_text(self):
         self.text_area.event_generate("<<Copy>>")
         
+        
     def paste_text(self):
         self.text_area.event_generate("<<Paste>>")
+        
         
     def select_all(self, event=None):
         self.text_area.tag_add(tk.SEL, "1.0", tk.END)
